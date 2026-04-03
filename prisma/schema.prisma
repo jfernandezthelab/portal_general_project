@@ -1,3 +1,7 @@
+// Peak CU — Initiatives Portal
+// Generated: 2026-04-03
+// Project: 26.195.02 · The Lab Consulting
+
 generator client {
   provider = "prisma-client"
   output   = "../src/generated/prisma"
@@ -7,131 +11,266 @@ datasource db {
   provider = "postgresql"
 }
 
-// ─── CLIENTS ─────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────
+// ENUMS
+// ─────────────────────────────────────────────
+
+enum InitiativeType {
+  RPA_BOT
+  PIR
+  DASHBOARD
+}
+
+enum InitiativeStatus {
+  IN_PROGRESS
+  CLIENT_READY
+  EARLY_ESTIMATE
+  DE_PRIORITIZED
+}
+
+enum Workstream {
+  CONSUMER
+  COMMERCIAL_SB
+  BACK_OFFICE
+  LOAN_SERVICING
+  EXECUTIVE
+  ALL
+}
+
+enum SystemFlag {
+  NONE
+  SYS_IMPACT
+  SYS_BLOCKED
+  ORG_CHANGE
+}
+
+enum UserRole {
+  ADMIN
+  CONSULTANT
+  CLIENT_VIEWER
+  CLIENT_EDITOR
+}
+
+enum ProjectStatus {
+  ON_TRACK
+  AT_RISK
+  DELAYED
+  COMPLETE
+}
+
+enum ChangeStatus {
+  ACTIVE
+  RESOLVED
+  MONITORING
+}
+
+enum MilestoneStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETE
+  BLOCKED
+}
+
+enum SprintStatus {
+  PLANNED
+  ACTIVE
+  COMPLETE
+}
+
+// ─────────────────────────────────────────────
+// CLIENTS
+// ─────────────────────────────────────────────
 
 model Client {
-  id           String    @id @default(cuid())
+  id           String   @id @default(cuid())
   name         String
-  slug         String    @unique   // e.g. "peak-cu" — used in URLs
-  logoUrl      String?
-  primaryColor String    @default("#2dd4bf")
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  industry     String?
+  contactName  String?
+  contactEmail String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   // Relations
-  users        User[]
-  settings     Settings?
-  kpis         Kpi[]
-  milestones   Milestone[]
-  sprints      Sprint[]
+  users                User[]
+  settings             Settings?
+  initiatives          Initiative[]
+  kpis                 Kpi[]
+  milestones           Milestone[]
+  sprints              Sprint[]
+  systemChanges        SystemChange[]
 
   @@map("clients")
 }
 
-// ─── USERS ────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────
+// USERS
+// ─────────────────────────────────────────────
 
 model User {
-  id           String    @id @default(cuid())
-  email        String    @unique
-  passwordHash String
+  id           String   @id @default(cuid())
+  clientId     String
+  email        String   @unique
   name         String
-  role         Role      @default(CLIENT)
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  role         UserRole @default(CLIENT_VIEWER)
+  passwordHash String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   // Relations
-  clientId     String?
-  client       Client?   @relation(fields: [clientId], references: [id])
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
 
   @@map("users")
 }
 
-enum Role {
-  CLIENT
-  ADMIN
-}
-
-// ─── SETTINGS ────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────
+// SETTINGS  (one per client)
+// ─────────────────────────────────────────────
 
 model Settings {
-  id          String   @id @default(cuid())
-  progress    Int      @default(0)     // 0–100 percent
-  week        Int      @default(1)
-  totalWeeks  Int      @default(32)
-  lastUpdated DateTime @default(now())
-  status      String   @default("On Track")
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id          String        @id @default(cuid())
+  clientId    String        @unique
+  progress    Int           @default(0)     // 0–100 overall project %
+  status      ProjectStatus @default(ON_TRACK)
+  totalWeeks  Int           @default(0)
+  createdAt   DateTime      @default(now())
+  lastUpdated DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
 
   // Relations
-  clientId    String   @unique
-  client      Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
 
   @@map("settings")
 }
 
-// ─── KPIs ────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────
+// INITIATIVES  (RPA Bots · PIRs · Dashboards)
+// ─────────────────────────────────────────────
 
-model Kpi {
-  id        String   @id @default(cuid())
-  label     String
-  value     String
-  sub       String?
-  accent    String   @default("#2dd4bf")
-  sortOrder Int      @default(0)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+model Initiative {
+  id              String           @id @default(cuid())
+  clientId        String
+  name            String
+  type            InitiativeType
+  workstream      Workstream
+  status          InitiativeStatus @default(IN_PROGRESS)
+  estBenefitMin   Float?           // annual $ low end
+  estBenefitMax   Float?           // annual $ high end
+  benefitLabel    String?          // e.g. "$33K–$86K" (raw label from Excel)
+  volume          String?          // e.g. "480–1,248 units/mo"
+  systemFlag      SystemFlag       @default(NONE)
+  notes           String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
 
   // Relations
-  clientId  String
-  client    Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  client          Client                    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  kpis            Kpi[]
+  milestones      Milestone[]
+  systemChanges   InitiativeSystemChange[]
+
+  @@map("initiatives")
+}
+
+// ─────────────────────────────────────────────
+// KPIs  (metrics per initiative)
+// ─────────────────────────────────────────────
+
+model Kpi {
+  id           String   @id @default(cuid())
+  clientId     String
+  initiativeId String
+  label        String   // e.g. "Pull-through rate"
+  value        String   // stored as string to support ranges & text
+  unit         String?  // e.g. "%", "hrs", "FTE"
+  category     String?  // e.g. "throughput", "capacity", "quality"
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relations
+  client      Client     @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  initiative  Initiative @relation(fields: [initiativeId], references: [id], onDelete: Cascade)
 
   @@map("kpis")
 }
 
-// ─── MILESTONES ──────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────
+// MILESTONES
+// ─────────────────────────────────────────────
 
 model Milestone {
-  id        String   @id @default(cuid())
-  label     String
-  date      String                      // Display string e.g. "Jan 6"
-  percent   Int      @default(0)        // 0–100
-  done      Boolean  @default(false)
-  sortOrder Int      @default(0)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id           String          @id @default(cuid())
+  clientId     String
+  initiativeId String?         // null = project-level milestone
+  title        String
+  status       MilestoneStatus @default(PENDING)
+  dueDate      DateTime?
+  completedAt  DateTime?
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
 
   // Relations
-  clientId  String
-  client    Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  client     Client      @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  initiative Initiative? @relation(fields: [initiativeId], references: [id], onDelete: SetNull)
 
   @@map("milestones")
 }
 
-// ─── SPRINTS ─────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────
+// SPRINTS
+// ─────────────────────────────────────────────
 
 model Sprint {
-  id        String       @id @default(cuid())
-  weekLabel String                         // e.g. "Week 15"
-  dates     String                         // e.g. "Mar 24 – Apr 6"
-  itemName  String
-  dept      String
-  status    SprintStatus @default(PLANNED)
-  sortOrder Int          @default(0)
-  createdAt DateTime     @default(now())
-  updatedAt DateTime     @updatedAt
+  id           String       @id @default(cuid())
+  clientId     String
+  sprintNumber Int
+  startDate    DateTime
+  endDate      DateTime
+  status       SprintStatus @default(PLANNED)
+  goals        String?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
 
   // Relations
-  clientId  String
-  client    Client       @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
 
+  @@unique([clientId, sprintNumber])
   @@map("sprints")
 }
 
-enum SprintStatus {
-  IN_PROGRESS
-  PLANNED
-  NEXT_UP
-  DEPLOYED
-  DEV
+// ─────────────────────────────────────────────
+// SYSTEM CHANGES  (blockers & platform shifts)
+// ─────────────────────────────────────────────
+
+model SystemChange {
+  id                  String       @id @default(cuid())
+  clientId            String
+  title               String       // e.g. "Origence → MeridianLink"
+  impactSummary       String
+  recommendedAction   String
+  status              ChangeStatus @default(ACTIVE)
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+
+  // Relations
+  client       Client                   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  initiatives  InitiativeSystemChange[]
+
+  @@map("systemChanges")
+}
+
+// ─────────────────────────────────────────────
+// JOIN: initiatives ↔ system changes  (M-to-M)
+// ─────────────────────────────────────────────
+
+model InitiativeSystemChange {
+  id             String @id @default(cuid())
+  initiativeId   String
+  systemChangeId String
+
+  // Relations
+  initiative   Initiative   @relation(fields: [initiativeId], references: [id], onDelete: Cascade)
+  systemChange SystemChange @relation(fields: [systemChangeId], references: [id], onDelete: Cascade)
+
+  @@unique([initiativeId, systemChangeId])
+  @@map("initiativeSystemChanges")
 }
