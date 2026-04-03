@@ -1,0 +1,137 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── CLIENTS ─────────────────────────────────────────────────────────────────
+
+model Client {
+  id           String    @id @default(cuid())
+  name         String
+  slug         String    @unique   // e.g. "peak-cu" — used in URLs
+  logoUrl      String?
+  primaryColor String    @default("#2dd4bf")
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  // Relations
+  users        User[]
+  settings     Settings?
+  kpis         Kpi[]
+  milestones   Milestone[]
+  sprints      Sprint[]
+
+  @@map("clients")
+}
+
+// ─── USERS ────────────────────────────────────────────────────────────────────
+
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  passwordHash String
+  name         String
+  role         Role      @default(CLIENT)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  // Relations
+  clientId     String?
+  client       Client?   @relation(fields: [clientId], references: [id])
+
+  @@map("users")
+}
+
+enum Role {
+  CLIENT
+  ADMIN
+}
+
+// ─── SETTINGS ────────────────────────────────────────────────────────────────
+
+model Settings {
+  id          String   @id @default(cuid())
+  progress    Int      @default(0)     // 0–100 percent
+  week        Int      @default(1)
+  totalWeeks  Int      @default(32)
+  lastUpdated DateTime @default(now())
+  status      String   @default("On Track")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  clientId    String   @unique
+  client      Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@map("settings")
+}
+
+// ─── KPIs ────────────────────────────────────────────────────────────────────
+
+model Kpi {
+  id        String   @id @default(cuid())
+  label     String
+  value     String
+  sub       String?
+  accent    String   @default("#2dd4bf")
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  clientId  String
+  client    Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@map("kpis")
+}
+
+// ─── MILESTONES ──────────────────────────────────────────────────────────────
+
+model Milestone {
+  id        String   @id @default(cuid())
+  label     String
+  date      String                      // Display string e.g. "Jan 6"
+  percent   Int      @default(0)        // 0–100
+  done      Boolean  @default(false)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  clientId  String
+  client    Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@map("milestones")
+}
+
+// ─── SPRINTS ─────────────────────────────────────────────────────────────────
+
+model Sprint {
+  id        String       @id @default(cuid())
+  weekLabel String                         // e.g. "Week 15"
+  dates     String                         // e.g. "Mar 24 – Apr 6"
+  itemName  String
+  dept      String
+  status    SprintStatus @default(PLANNED)
+  sortOrder Int          @default(0)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  // Relations
+  clientId  String
+  client    Client       @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@map("sprints")
+}
+
+enum SprintStatus {
+  IN_PROGRESS
+  PLANNED
+  NEXT_UP
+  DEPLOYED
+  DEV
+}

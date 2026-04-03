@@ -33,8 +33,9 @@ yarn-error.log*
 .env.local
 .env*.local
 
-# prisma dev database
+# prisma
 prisma/migrations/dev.db
+src/generated/
 
 # vercel
 .vercel
